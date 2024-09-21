@@ -22,15 +22,25 @@ impl Write for Output {
     }
 }
 
-pub fn solve_problem<T: Send>(mut read: impl FnMut(&mut Input) -> T, solve: impl Fn(T, &mut Output) + Sync) {
+pub fn solve_problem<T: Send>(mut read: impl FnMut(&mut Input) -> T, solve: impl Fn(T, &mut Output) + Sync, sequential: bool) {
     let mut input = Input::new();
     let t: usize = input.next();
     let data: Vec<T> = repeat_with(|| read(&mut input)).take(t).collect();
     let mut outputs = vec![Output(Vec::new()); t];
-    data.into_par_iter().zip(&mut outputs).for_each(|(data, output)| solve(data, output));
-    for (idx, output) in outputs.into_iter().enumerate() {
-        std::io::stdout().write(format!("Case #{}: ", idx + 1).as_bytes()).unwrap();
-        std::io::stdout().write(&output.0).unwrap();
+    if sequential {
+        eprintln!("{}", "Running sequential ...");
+        data.into_iter().zip(&mut outputs).enumerate().for_each(|(idx, (data, output))| {
+            solve(data, output);
+            std::io::stdout().write(format!("Case #{}: ", idx + 1).as_bytes()).unwrap();
+            std::io::stdout().write(&output.0).unwrap();
+        });
+    }
+    else {
+        data.into_par_iter().zip(&mut outputs).for_each(|(data, output)| solve(data, output));
+        for (idx, output) in outputs.into_iter().enumerate() {
+            std::io::stdout().write(format!("Case #{}: ", idx + 1).as_bytes()).unwrap();
+            std::io::stdout().write(&output.0).unwrap();
+        }
     }
 }
 
@@ -38,7 +48,7 @@ pub fn solve_problem<T: Send>(mut read: impl FnMut(&mut Input) -> T, solve: impl
 macro_rules! run {
     ($x:tt, $y:tt) => {
         fn main() {
-            $crate::solve_problem($x, $y);
+            $crate::solve_problem($x, $y, std::env::args().len() > 1);
         }
     };
 }
