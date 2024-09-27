@@ -163,7 +163,7 @@ pub mod input {
     }
 }
 
-use std::{fmt::Debug, iter::repeat};
+use std::{fmt::Debug, iter::repeat, sync::atomic::AtomicU64};
 
 pub use input::*;
 
@@ -347,18 +347,20 @@ pub trait OrdExt: Ord + Sized {
 
 impl<T> OrdExt for T where T: Ord {}
 
-static mut W: u64 = 0;
+static W: AtomicU64 = AtomicU64::new(0);
 
+/// Sets a delay after panic before termination. This can be used to know where in a program a
+/// panic happened based only on the running time by setting different delays at different program
+/// points. If `init` is not called before the panic this has no effect.
 pub fn setw(w: u64) {
-    unsafe {
-        W = w;
-    }
+    W.store(w, std::sync::atomic::Ordering::SeqCst);
 }
 
+/// See `setw`
 pub fn init() {
     std::panic::set_hook(Box::new(|p| {
         let now = std::time::Instant::now();
-        while now.elapsed() < std::time::Duration::from_millis(unsafe { W }) {}
+        while now.elapsed() < std::time::Duration::from_millis(W.load(std::sync::atomic::Ordering::SeqCst)) {}
         eprintln!("{:?}", p);
         std::process::exit(1);
     }));
