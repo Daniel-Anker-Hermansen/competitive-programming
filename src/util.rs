@@ -7,7 +7,7 @@ pub mod input {
         str::FromStr,
     };
 
-    trait LocalFromStr {
+    pub trait LocalFromStr {
         fn local_from_str(s: &str) -> Self;
     }
 
@@ -159,6 +159,27 @@ pub mod input {
             C: FromIterator<R>,
         {
             (0..n).map(|_| f(self.next())).collect()
+        }
+
+        pub fn directed_edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>> where T: LocalFromStr + Clone {
+            let mut edges = vec![vec![]; n];
+            self.for_each_n(m, |(u, v, c): (usize, usize, T)| {
+                let u = u - 1;
+                let v = v - 1;
+                edges[u].push((v, c));
+            });
+            edges
+        }
+
+        pub fn edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>> where T: LocalFromStr + Clone {
+            let mut edges = vec![vec![]; n];
+            self.for_each_n(m, |(u, v, c): (usize, usize, T)| {
+                let u = u - 1;
+                let v = v - 1;
+                edges[u].push((v, c.clone()));
+                edges[v].push((u, c));
+            });
+            edges
         }
     }
 }
