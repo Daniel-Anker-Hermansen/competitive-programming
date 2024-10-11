@@ -161,7 +161,10 @@ pub mod input {
             (0..n).map(|_| f(self.next())).collect()
         }
 
-        pub fn directed_edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>> where T: LocalFromStr + Clone {
+        pub fn directed_edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>>
+        where
+            T: LocalFromStr + Clone,
+        {
             let mut edges = vec![vec![]; n];
             self.for_each_n(m, |(u, v, c): (usize, usize, T)| {
                 let u = u - 1;
@@ -171,7 +174,10 @@ pub mod input {
             edges
         }
 
-        pub fn edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>> where T: LocalFromStr + Clone {
+        pub fn edges<T>(&mut self, n: usize, m: usize) -> Vec<Vec<(usize, T)>>
+        where
+            T: LocalFromStr + Clone,
+        {
             let mut edges = vec![vec![]; n];
             self.for_each_n(m, |(u, v, c): (usize, usize, T)| {
                 let u = u - 1;
@@ -184,7 +190,7 @@ pub mod input {
     }
 }
 
-use std::{fmt::Debug, iter::repeat, sync::atomic::AtomicU64};
+use std::{collections::HashMap, fmt::Debug, hash::Hash, iter::repeat, sync::atomic::AtomicU64};
 
 pub use input::*;
 
@@ -196,7 +202,6 @@ where
 {
     a.flat_map(move |a| repeat(a).zip(b.clone()))
 }
-
 
 #[derive(Debug)]
 pub struct SegmentTree<T, F> {
@@ -381,8 +386,76 @@ pub fn setw(w: u64) {
 pub fn init() {
     std::panic::set_hook(Box::new(|p| {
         let now = std::time::Instant::now();
-        while now.elapsed() < std::time::Duration::from_millis(W.load(std::sync::atomic::Ordering::SeqCst)) {}
+        while now.elapsed()
+            < std::time::Duration::from_millis(W.load(std::sync::atomic::Ordering::SeqCst))
+        {
+        }
         eprintln!("{:?}", p);
         std::process::exit(1);
     }));
+}
+
+pub fn suffix_array<T: Ord + Debug + Hash>(s: &[T]) -> Vec<usize> {
+    if s.len() <= 3 {
+        let mut ans: Vec<usize> = (0..s.len()).collect();
+        ans.sort_by_key(|&i| &s[i..]);
+        return ans;
+    }
+    let mut v: Vec<usize> = (1..=s.len())
+        .step_by(3)
+        .chain((2..s.len()).step_by(3))
+        .collect();
+    let w = v.clone();
+    v.sort_by_key(|&i| &s[i..(i + 3).min(s.len())]);
+    v.dedup_by_key(|&mut i| &s[i..(i + 3).min(s.len())]);
+    let m: HashMap<&[T], usize> = v.iter().enumerate().map(|(j, &i)| (&s[i..(i + 3).min(s.len())], j)).collect();
+    let mut z = w.clone();
+    for i in 0..z.len() {
+        z[i] = m[&s[z[i]..(z[i] + 3).min(s.len())]];
+    }
+    let suf = suffix_array(&z);
+    let mut ones: Vec<usize> = (0..s.len()).step_by(3).collect();
+    let mut rank_of = vec![0; s.len() + 1];
+    for i in 0..suf.len() {
+        rank_of[w[suf[i]]] = i + 1;
+    }
+    rank_of[s.len()] = 0;
+    ones.sort_by_key(|&i| {
+        (&s[i], rank_of.get(i + 1).cloned().unwrap_or(0))
+    });
+    let mut ones = ones.into_iter().peekable();
+    let mut two_threes = suf.into_iter().map(|i| w[i]).filter(|k| *k != s.len()).peekable();
+    let mut ans = Vec::with_capacity(s.len());
+    while let (Some(l), Some(r)) = (ones.peek(), two_threes.peek()) {
+        if r % 3 == 1 {
+            let lt = (&s[*l..(*l + 1).min(s.len())], rank_of.get(l + 1).cloned().unwrap_or(0));
+            let rt = (&s[*r..(*r + 1).min(s.len())], rank_of.get(r + 1).cloned().unwrap_or(0));
+            if lt < rt {
+                ans.push(*l);
+                ones.next();
+            } else {
+                ans.push(*r);
+                two_threes.next();
+            }
+        } else {
+            let lt = (
+                &s[*l..(l + 2).min(s.len())],
+                rank_of.get(l + 2).cloned().unwrap_or(0),
+            );
+            let rt = (
+                &s[*r..(r + 2).min(s.len())],
+                rank_of.get(r + 2).cloned().unwrap_or(0),
+            );
+            if lt < rt {
+                ans.push(*l);
+                ones.next();
+            } else {
+                ans.push(*r);
+                two_threes.next();
+            }
+        }
+    }
+    ans.extend(ones);
+    ans.extend(two_threes);
+    ans
 }
